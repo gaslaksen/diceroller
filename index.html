@@ -6,6 +6,7 @@
   <title>Dice Roller</title>
   <!-- Favicon: simple dice icon (SVG, works everywhere) -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='4' y='4' width='56' height='56' rx='10' ry='10' fill='%23ffffff' stroke='%230d6efd' stroke-width='4'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%230d6efd'/%3E%3C/svg%3E" />
+
   <style>
     :root {
       --bg: #f4f6f8;
@@ -45,6 +46,21 @@
     h1 {
       margin: 0 0 16px;
       font-size: 26px;
+      letter-spacing: 0.5px;
+      color: #1b1b1b;
+      text-shadow:
+        0 2px 0 #e6e6e6,
+        0 3px 0 #d0d0d0,
+        0 4px 6px rgba(0,0,0,0.18);
+    }
+
+    /* Emoji gets shadow but no white outline */
+    h1 .emoji {
+      display: inline-block;
+      margin-right: 6px;
+      /* Lighter, softer shadow for the emoji */
+      text-shadow:
+        0 1px 2px rgba(0,0,0,0.22);
     }
 
     .dice-grid {
@@ -156,17 +172,74 @@
       flex-wrap: wrap;
     }
 
+    .sound-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      font-size: 14px;
+      color: #555;
+      user-select: none;
+    }
+
+    .sound-toggle input {
+      width: 18px;
+      height: 18px;
+      accent-color: #0d6efd;
+    }
+
+    /* 3D-ish buttons */
     button {
       padding: 10px 18px;
       font-size: 16px;
-      border: none;
-      border-radius: 10px;
+      border: 1px solid rgba(0,0,0,0.12);
+      border-radius: 12px;
       cursor: pointer;
-      background: #0d6efd;
       color: #fff;
+      background: linear-gradient(180deg, #2b7bff, #0d6efd);
+      box-shadow:
+        0 10px 16px rgba(0,0,0,0.16),
+        0 2px 0 rgba(255,255,255,0.25) inset,
+        0 -10px 18px rgba(0,0,0,0.18) inset;
+      transition: transform 120ms ease, box-shadow 160ms ease, filter 160ms ease;
+      position: relative;
+      overflow: hidden;
+      touch-action: manipulation;
     }
 
-    button:hover { background: #0b5ed7; }
+    button::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.35), rgba(255,255,255,0) 45%);
+      pointer-events: none;
+    }
+
+    button:hover {
+      filter: brightness(1.03);
+      transform: translateY(-1px);
+      box-shadow:
+        0 12px 18px rgba(0,0,0,0.18),
+        0 2px 0 rgba(255,255,255,0.28) inset,
+        0 -10px 18px rgba(0,0,0,0.18) inset;
+    }
+
+    button:active {
+      transform: translateY(1px);
+      box-shadow:
+        0 7px 12px rgba(0,0,0,0.16),
+        0 2px 0 rgba(255,255,255,0.18) inset,
+        0 -10px 18px rgba(0,0,0,0.22) inset;
+    }
+
+    button:focus-visible {
+      outline: none;
+      box-shadow:
+        0 12px 18px rgba(0,0,0,0.18),
+        0 0 0 4px rgba(13,110,253,0.25),
+        0 2px 0 rgba(255,255,255,0.28) inset,
+        0 -10px 18px rgba(0,0,0,0.18) inset;
+    }
 
     .hint {
       font-size: 14px;
@@ -189,7 +262,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>🎲 Dice Roller</h1>
+    <h1><span class="emoji">🎲</span> Dice Roller</h1>
 
     <div class="dice-grid" id="diceGrid" aria-label="Dice">
       <!-- Pre-render dice so they appear even in iOS preview/quicklook (which may not run JS) -->
@@ -237,6 +310,11 @@
       <button type="button" onclick="rollSelectedDice()">Roll Selected</button>
     </div>
 
+    <label class="sound-toggle">
+      <input type="checkbox" id="soundToggle" checked />
+      Sound
+    </label>
+
     <div class="hint">Tap dice to select which ones to re-roll</div>
   </div>
 
@@ -267,6 +345,52 @@
       return Math.floor(Math.random() * 6) + 1;
     }
 
+    // --- Sound (Web Audio, no external files) ---
+    let audioCtx = null;
+    let soundEnabled = true;
+
+    function ensureAudio() {
+      if (!soundEnabled) return null;
+      if (!audioCtx) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return null;
+        audioCtx = new Ctx();
+      }
+      // iOS may start suspended until a user gesture
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
+      return audioCtx;
+    }
+
+    function playDiceRollSound() {
+      const ctx = ensureAudio();
+      if (!ctx) return;
+
+      const now = ctx.currentTime;
+
+      // Discrete techno clacks only
+      const CLACK_COUNT = 4;
+
+      for (let k = 0; k < CLACK_COUNT; k++) {
+        const t = now + 0.05 + k * 0.11 + (Math.random() * 0.025);
+
+        const osc = ctx.createOscillator();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(180 + Math.random() * 240, t);
+
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.055, t + 0.006);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.035);
+
+        osc.connect(g);
+        g.connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.04);
+      }
+    }
+
     function setFaceClass(el, value) {
       el.classList.remove('v1','v2','v3','v4','v5','v6');
       el.classList.add(`v${value}`);
@@ -285,25 +409,6 @@
 
     function buildDice() {
       const nodes = Array.from(document.querySelectorAll('#diceGrid .die'));
-      if (nodes.length !== NUM_DICE) {
-        const grid = document.getElementById('diceGrid');
-        grid.innerHTML = '';
-        for (let i = 0; i < NUM_DICE; i++) {
-          const d = document.createElement('div');
-          d.className = 'die selected v1';
-          d.dataset.die = String(i);
-          const pips = document.createElement('div');
-          pips.className = 'pips';
-          for (let p = 1; p <= 9; p++) {
-            const pip = document.createElement('div');
-            pip.className = `pip p${p}`;
-            pips.appendChild(pip);
-          }
-          d.appendChild(pips);
-          grid.appendChild(d);
-          nodes.push(d);
-        }
-      }
 
       nodes.slice(0, NUM_DICE).forEach((d, i) => {
         const die = dice[i];
@@ -364,12 +469,17 @@
     }
 
     function rollAllDice() {
+      playDiceRollSound();
       dice.forEach((_, i) => animateRoll(i, roll()));
       // Deselect all dice after rolling
       deselectAllDice();
     }
 
     function rollSelectedDice() {
+      const anySelected = dice.some(die => die.selected);
+      if (!anySelected) return; // nothing to roll, no sound
+
+      playDiceRollSound();
       dice.forEach((die, i) => {
         if (die.selected) animateRoll(i, roll());
       });
@@ -381,21 +491,50 @@
     function runTests() {
       console.assert(typeof rollAllDice === 'function', 'rollAllDice should exist');
       console.assert(typeof rollSelectedDice === 'function', 'rollSelectedDice should exist');
+      console.assert(typeof playDiceRollSound === 'function', 'playDiceRollSound should exist');
+
       for (let k = 0; k < 500; k++) {
         const r = roll();
         console.assert(r >= 1 && r <= 6, 'roll() must return 1..6');
       }
 
-      // New test: deselectAllDice clears selections
+      // Test: deselectAllDice clears selections
       dice.forEach(d => d.selected = true);
       deselectAllDice();
       console.assert(dice.every(d => d.selected === false), 'deselectAllDice() should clear selected state');
+
+      // Test: selection toggling updates DOM class when elements exist
+      if (dice[0].el) {
+        dice[0].selected = false;
+        setSelectedClass(dice[0].el, false);
+        console.assert(!dice[0].el.classList.contains('selected'), 'die should not have selected class when unselected');
+      }
+
+      // Test: rollSelectedDice should NOT play sound when nothing is selected
+      const originalSound = playDiceRollSound;
+      let soundCalls = 0;
+      window.playDiceRollSound = function () { soundCalls += 1; };
+      dice.forEach(d => d.selected = false);
+      rollSelectedDice();
+      console.assert(soundCalls === 0, 'rollSelectedDice() should not play sound when nothing is selected');
+      window.playDiceRollSound = originalSound;
 
       console.log('✅ Dice Roller ready (crypto RNG:', !!(window.crypto && window.crypto.getRandomValues), ')');
     }
 
     function init() {
       buildDice();
+
+      const toggle = document.getElementById('soundToggle');
+      if (toggle) {
+        soundEnabled = !!toggle.checked;
+        toggle.addEventListener('change', () => {
+          soundEnabled = !!toggle.checked;
+          if (soundEnabled) ensureAudio();
+        });
+      }
+
+      // Initial faces
       dice.forEach((die) => {
         const v = roll();
         die.value = v;
@@ -405,6 +544,7 @@
           setFaceClass(die.el, v);
         }
       });
+
       runTests();
     }
 
