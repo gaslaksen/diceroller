@@ -4,14 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Dice Roller</title>
+  <!-- Favicon: simple dice icon (SVG, works everywhere) -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='4' y='4' width='56' height='56' rx='10' ry='10' fill='%23ffffff' stroke='%230d6efd' stroke-width='4'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%230d6efd'/%3E%3C/svg%3E" />
   <style>
     :root {
       --bg: #f4f6f8;
       --card: #ffffff;
-      --border: #cfcfcf;
-      --borderSelected: #0d6efd;
-      --selectedBg: #d1e7ff;
-      --pip: #111;
+      --border: rgba(0,0,0,0.12);
+      --borderSelected: rgba(13,110,253,0.75);
+      --selectedGlow: rgba(13,110,253,0.22);
+      --pip: #121212;
       --shadow: rgba(0,0,0,0.10);
     }
 
@@ -27,6 +29,7 @@
       align-items: center;
       padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom)) 16px;
       -webkit-text-size-adjust: 100%;
+      perspective: 900px;
     }
 
     .container {
@@ -51,10 +54,13 @@
       margin: 18px 0 20px;
     }
 
+    /* 3D-ish die */
     .die {
-      background: #fff;
-      border: 2px solid var(--border);
-      border-radius: 14px;
+      background:
+        radial-gradient(circle at 28% 22%, rgba(255,255,255,0.95), rgba(255,255,255,0) 45%),
+        linear-gradient(145deg, #ffffff, #e7edf5);
+      border: 1px solid var(--border);
+      border-radius: 16px;
       cursor: pointer;
       user-select: none;
       -webkit-tap-highlight-color: transparent;
@@ -63,19 +69,43 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
-      transition: transform 120ms ease, border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+      box-shadow:
+        0 12px 20px rgba(0,0,0,0.16),
+        0 2px 0 rgba(255,255,255,0.65) inset,
+        0 -10px 18px rgba(0,0,0,0.07) inset;
+      transition: transform 140ms ease, box-shadow 160ms ease, border-color 160ms ease;
       position: relative;
-      min-height: 96px; /* ensures visible on older browsers without aspect-ratio */
+      min-height: 96px; /* fallback if aspect-ratio unsupported */
+      overflow: hidden;
+      transform: translateZ(0);
+      will-change: transform;
+    }
+
+    .die::before {
+      content: "";
+      position: absolute;
+      inset: 6px;
+      border-radius: 12px;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.65) inset;
+      pointer-events: none;
     }
 
     .die.selected {
-      background: var(--selectedBg);
       border-color: var(--borderSelected);
-      box-shadow: 0 2px 14px rgba(13,110,253,0.25);
+      box-shadow:
+        0 12px 22px rgba(0,0,0,0.14),
+        0 0 0 4px var(--selectedGlow),
+        0 2px 0 rgba(255,255,255,0.65) inset,
+        0 -10px 18px rgba(0,0,0,0.06) inset;
     }
 
-    .die:active { transform: translateY(1px); }
+    @media (hover:hover) {
+      .die:hover {
+        transform: translateY(-1px) rotateX(6deg) rotateY(-6deg);
+      }
+    }
+
+    .die:active { transform: translateY(1px) rotateX(3deg) rotateY(-3deg); }
 
     .pips {
       width: 64px;
@@ -91,41 +121,32 @@
       width: 12px;
       height: 12px;
       border-radius: 50%;
-      background: var(--pip);
+      background: radial-gradient(circle at 30% 30%, #2a2a2a, var(--pip));
       align-self: center;
       justify-self: center;
       opacity: 0;
+      box-shadow:
+        0 1px 0 rgba(255,255,255,0.35) inset,
+        0 1px 2px rgba(0,0,0,0.35);
     }
 
     /* Visible pips per face (1–6 only) */
     .die.v1 .pip.p5 { opacity: 1; }
-
     .die.v2 .pip.p1, .die.v2 .pip.p9 { opacity: 1; }
-
     .die.v3 .pip.p1, .die.v3 .pip.p5, .die.v3 .pip.p9 { opacity: 1; }
-
     .die.v4 .pip.p1, .die.v4 .pip.p3, .die.v4 .pip.p7, .die.v4 .pip.p9 { opacity: 1; }
-
     .die.v5 .pip.p1, .die.v5 .pip.p3, .die.v5 .pip.p5, .die.v5 .pip.p7, .die.v5 .pip.p9 { opacity: 1; }
-
     .die.v6 .pip.p1, .die.v6 .pip.p3, .die.v6 .pip.p4, .die.v6 .pip.p6, .die.v6 .pip.p7, .die.v6 .pip.p9 { opacity: 1; }
 
-    /* Rolling animation */
-    .die.rolling { animation: rollWiggle 520ms ease-in-out; }
-    .die.rolling .pips { animation: rollBlur 520ms ease-in-out; }
+    /* Rolling animation (visual) */
+    .die.rolling { animation: rollWiggle 650ms ease-in-out; }
 
     @keyframes rollWiggle {
       0%   { transform: rotate(0deg) scale(1); }
-      25%  { transform: rotate(-10deg) scale(1.02); }
-      50%  { transform: rotate(12deg) scale(1.04); }
-      75%  { transform: rotate(-6deg) scale(1.02); }
+      20%  { transform: rotate(-12deg) scale(1.03); }
+      45%  { transform: rotate(14deg) scale(1.05); }
+      70%  { transform: rotate(-8deg) scale(1.03); }
       100% { transform: rotate(0deg) scale(1); }
-    }
-
-    @keyframes rollBlur {
-      0%   { filter: blur(0px); opacity: 1; }
-      50%  { filter: blur(1.2px); opacity: 0.9; }
-      100% { filter: blur(0px); opacity: 1; }
     }
 
     .buttons {
@@ -169,7 +190,47 @@
 <body>
   <div class="container">
     <h1>🎲 Dice Roller</h1>
-    <div class="dice-grid" id="diceGrid" aria-label="Dice"></div>
+
+    <div class="dice-grid" id="diceGrid" aria-label="Dice">
+      <!-- Pre-render dice so they appear even in iOS preview/quicklook (which may not run JS) -->
+      <div class="die selected v1" data-die="0"><div class="pips">
+        <div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div>
+        <div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div>
+        <div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div>
+      </div></div>
+      <div class="die selected v1" data-die="1"><div class="pips">
+        <div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div>
+        <div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div>
+        <div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div>
+      </div></div>
+      <div class="die selected v1" data-die="2"><div class="pips">
+        <div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div>
+        <div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div>
+        <div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div>
+      </div></div>
+      <div class="die selected v1" data-die="3"><div class="pips">
+        <div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div>
+        <div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div>
+        <div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div>
+      </div></div>
+      <div class="die selected v1" data-die="4"><div class="pips">
+        <div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div>
+        <div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div>
+        <div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div>
+      </div></div>
+      <div class="die selected v1" data-die="5"><div class="pips">
+        <div class="pip p1"></div><div class="pip p2"></div><div class="pip p3"></div>
+        <div class="pip p4"></div><div class="pip p5"></div><div class="pip p6"></div>
+        <div class="pip p7"></div><div class="pip p8"></div><div class="pip p9"></div>
+      </div></div>
+    </div>
+
+    <noscript>
+      <div class="hint" style="margin-top:10px;color:#b00020;">
+        JavaScript is disabled (or not supported in this viewer). The dice will show, but rolling won’t work.
+        Open this file in Safari (not the iOS preview) or host it on a website.
+      </div>
+    </noscript>
 
     <div class="buttons">
       <button type="button" onclick="rollAllDice()">Roll All</button>
@@ -185,11 +246,24 @@
       value: 1,
       selected: true,
       el: null,
-      intervalId: null,
-      timeoutId: null,
+      timeouts: [],
     }));
 
+    // Unbiased 1–6 RNG using crypto when available
     function roll() {
+      const cryptoObj = window.crypto || window.msCrypto;
+      if (cryptoObj && typeof cryptoObj.getRandomValues === 'function') {
+        const buf = new Uint32Array(1);
+        // Rejection sampling to avoid modulo bias
+        const max = 0xFFFFFFFF;
+        const limit = max - (max % 6);
+        let x = max;
+        while (x >= limit) {
+          cryptoObj.getRandomValues(buf);
+          x = buf[0];
+        }
+        return (x % 6) + 1;
+      }
       return Math.floor(Math.random() * 6) + 1;
     }
 
@@ -202,89 +276,134 @@
       el.classList.toggle('selected', selected);
     }
 
+    function deselectAllDice() {
+      dice.forEach((die) => {
+        die.selected = false;
+        if (die.el) setSelectedClass(die.el, false);
+      });
+    }
+
     function buildDice() {
-      const grid = document.getElementById('diceGrid');
-      grid.innerHTML = '';
-
-      dice.forEach((die, i) => {
-        const d = document.createElement('div');
-        d.className = 'die selected v1';
-        d.setAttribute('role', 'button');
-        d.setAttribute('aria-label', `Die ${i+1}`);
-
-        const pips = document.createElement('div');
-        pips.className = 'pips';
-
-        for (let p = 1; p <= 9; p++) {
-          const pip = document.createElement('div');
-          pip.className = `pip p${p}`;
-          pips.appendChild(pip);
+      const nodes = Array.from(document.querySelectorAll('#diceGrid .die'));
+      if (nodes.length !== NUM_DICE) {
+        const grid = document.getElementById('diceGrid');
+        grid.innerHTML = '';
+        for (let i = 0; i < NUM_DICE; i++) {
+          const d = document.createElement('div');
+          d.className = 'die selected v1';
+          d.dataset.die = String(i);
+          const pips = document.createElement('div');
+          pips.className = 'pips';
+          for (let p = 1; p <= 9; p++) {
+            const pip = document.createElement('div');
+            pip.className = `pip p${p}`;
+            pips.appendChild(pip);
+          }
+          d.appendChild(pips);
+          grid.appendChild(d);
+          nodes.push(d);
         }
+      }
 
-        d.appendChild(pips);
+      nodes.slice(0, NUM_DICE).forEach((d, i) => {
+        const die = dice[i];
+        die.el = d;
+        d.setAttribute('role', 'button');
+        d.setAttribute('aria-label', `Die ${i + 1}`);
         d.addEventListener('click', () => {
           die.selected = !die.selected;
           setSelectedClass(d, die.selected);
         });
-
-        grid.appendChild(d);
-        die.el = d;
       });
     }
 
     function clearTimers(i) {
       const die = dice[i];
-      if (die.intervalId) { clearInterval(die.intervalId); die.intervalId = null; }
-      if (die.timeoutId) { clearTimeout(die.timeoutId); die.timeoutId = null; }
-      die.el.classList.remove('rolling');
+      die.timeouts.forEach(t => clearTimeout(t));
+      die.timeouts = [];
+      if (die.el) die.el.classList.remove('rolling');
     }
 
-    function animateRoll(i, finalValue, duration = 520) {
+    // Animation that "slows down" like real dice + adds slight randomness per die
+    function animateRoll(i, finalValue) {
       const die = dice[i];
       clearTimers(i);
 
-      die.el.classList.add('rolling');
-      die.intervalId = setInterval(() => {
-        const v = roll();
-        die.value = v;
-        setFaceClass(die.el, v);
-      }, 70);
+      // Per-die randomized feel
+      const startDelay = (roll() - 1) * 10;       // 0–50ms
+      const steps = 10 + (roll() - 1);            // 10–15 flips
+      const base = 35 + (roll() - 1) * 2;         // 35–45ms
+      const accel = 1.16 + (roll() - 1) * 0.01;   // 1.16–1.21 slowdown factor
 
-      die.timeoutId = setTimeout(() => {
-        clearTimers(i);
-        die.value = finalValue;
-        setFaceClass(die.el, finalValue);
-      }, duration);
+      const t0 = setTimeout(() => {
+        if (die.el) die.el.classList.add('rolling');
+        let delay = base;
+
+        for (let s = 0; s < steps; s++) {
+          const t = setTimeout(() => {
+            const v = roll();
+            die.value = v;
+            if (die.el) setFaceClass(die.el, v);
+          }, delay);
+          die.timeouts.push(t);
+          delay = Math.round(delay * accel);
+        }
+
+        // Final settle
+        const settle = setTimeout(() => {
+          die.value = finalValue;
+          if (die.el) {
+            setFaceClass(die.el, finalValue);
+            die.el.classList.remove('rolling');
+          }
+        }, delay + 30);
+        die.timeouts.push(settle);
+      }, startDelay);
+
+      die.timeouts.push(t0);
     }
 
     function rollAllDice() {
       dice.forEach((_, i) => animateRoll(i, roll()));
+      // Deselect all dice after rolling
+      deselectAllDice();
     }
 
     function rollSelectedDice() {
       dice.forEach((die, i) => {
         if (die.selected) animateRoll(i, roll());
       });
+      // Deselect all dice after rolling
+      deselectAllDice();
     }
 
-    // Basic tests
+    // Tests (basic sanity + crypto availability)
     function runTests() {
       console.assert(typeof rollAllDice === 'function', 'rollAllDice should exist');
-      for (let k = 0; k < 100; k++) {
+      console.assert(typeof rollSelectedDice === 'function', 'rollSelectedDice should exist');
+      for (let k = 0; k < 500; k++) {
         const r = roll();
         console.assert(r >= 1 && r <= 6, 'roll() must return 1..6');
       }
-      console.log('✅ Dice Roller ready');
+
+      // New test: deselectAllDice clears selections
+      dice.forEach(d => d.selected = true);
+      deselectAllDice();
+      console.assert(dice.every(d => d.selected === false), 'deselectAllDice() should clear selected state');
+
+      console.log('✅ Dice Roller ready (crypto RNG:', !!(window.crypto && window.crypto.getRandomValues), ')');
     }
 
     function init() {
       buildDice();
-      dice.forEach((die, i) => {
+      dice.forEach((die) => {
         const v = roll();
         die.value = v;
         die.selected = true;
-        setSelectedClass(die.el, true);
-        setFaceClass(die.el, v);
+        if (die.el) {
+          setSelectedClass(die.el, true);
+          setFaceClass(die.el, v);
+        }
       });
       runTests();
     }
